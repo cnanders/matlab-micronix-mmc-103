@@ -30,21 +30,32 @@ classdef MMC103 < handle
         % "TCP server" mode
         u16TcpipPort = uint16(4001)
         
-        % This code uses fwrite() and fread() for all tcpip
-        % communication (instead of fprintf() and fscanf()).  The latter
-        % deal with ASCII commands and MATLAB does some magic with adding
-        % terminators in fprintf() and also in polling for terminators in
-        % fread().  The MAGIC is difficult to debug when it does not work
+        % The tcpip implementation can make use of fprintf() for writing
+        % commands and fscanf() for reading commands since all of the data
+        % is passed using ASCII format.  fprintf() converts an ASCII string
+        % to an array of int8 (one int8 per character) and subsequently converts
+        % each int8 to 8 bits (e.g., 00110100) to form the data packet.
+        % Note that there is also a subtle thing with fprintf that it
+        % formats the char you provide as %s\n (or optionally you can
+        % provide a format) and replaces instances of \n with the
+        % terminator byte
+        %
+        % fscanf() is a nice utility because while it is reading, it
+        % continuously polls until it reads the terminator byte.
+        %
+        % The tcpclient implmentation must manually build the data packets
+        % and manually poll for the termination byte because fprintf and
+        % fscanf are not supported by tcpclient instances. 
         %
         % fwrite() and fread() write and read binary data and
-        % don't do any of the terminator magic.  This is good because
+        % fread does not do any polling.  This is good because
         % it lets us directly  create the data packets that are sent and
         % directly unpack the data packets that are received. 
         %
         % Writing:
         % During write commands, the binary version of the ASCII command
-        % must be followed by a space (32) and a carriage return (13).
-        % Optionally, it can be followed by 32 10 13 (space + line feed +
+        % must be followed by a carriage return (13).
+        % Optionally, it can be followed 10 13 (space + line feed +
         % carriage return).  Multiple write commands can be sent at
         % once
         %
@@ -56,6 +67,13 @@ classdef MMC103 < handle
         % response has a 10 and a 13 after it. When a 13 is read, the data
         % read operation containing the result of every command since the
         % previous read is done.
+        
+        % {logical 1x1} use manually created binary data packets with tcpip 
+        % uses fwrite instead of fprintf
+        lManualPacket = false
+        % {logical 1x1} use manual polling and reading of binary data with 
+        % tcpip (uses fread in a while loop instead of fscanf)
+        lManualPollAndRead = false
         
         % serial config
         % --------------------------------
@@ -186,7 +204,6 @@ classdef MMC103 < handle
         % Write an ASCII command to  
         % Create the binary command packet as follows:
         % Convert the char command into a list of uint8 (decimal), 
-        % concat with a space === 32 (base10) 
         % concat with the first terminator: 10 (base10) === 'line feed')
         % concat with the second terminator: 13 (base10)=== 'carriage return') 
         % write the command to the tcpip port (the nPort 5150A)
@@ -195,11 +212,19 @@ classdef MMC103 < handle
             
             switch this.cConnection
                 case this.cCONNECTION_TCPCLIENT
-                    u8Cmd = [uint8(cCmd) 32 10 13];
+                    u8Cmd = [uint8(cCmd) 10 13];
                     write(this.comm, u8Cmd)
                 case  this.cCONNECTION_TCPIP
-                    u8Cmd = [uint8(cCmd) 32 10 13];
-                    fwrite(this.comm, u8Cmd)
+                    if this.lManualPacket
+                        u8Cmd = [uint8(cCmd) 10 13];
+                        fwrite(this.comm, u8Cmd);
+                    else
+                        % default format for fprintf is %s\n and 
+                        % fprintf replaces instances of \n by the terminator
+                        % then fprintf converts each ASCII character to its
+                        % 8-bit representation to create the data packet
+                        fprintf(this.comm, cCmd);
+                    end
                 case this.cCONNECTION_SERIAL
                     fprintf(this.comm, cCmd);
             end
@@ -220,12 +245,18 @@ classdef MMC103 < handle
                     % convert to ASCII (char)
                     c = char(u8Result);
                 case this.cCONNECTION_TCPIP
-                    u8Result = this.freadToTerminator(int8(13));
-                    % remove line feed terminator of single return value
-                    % and remove carriage return terminator
-                    u8Result = u8Result(1 : end - 2);
-                    % convert to ASCII (char)
-                    c = char(u8Result);
+                    if this.lManualPollAndRead
+                        u8Result = this.freadToTerminator(int8(13));
+                        % remove line feed terminator of single return value
+                        % and remove carriage return terminator
+                        u8Result = u8Result(1 : end - 2);
+                        % convert to ASCII (char)
+                        c = char(u8Result);
+                    else
+                        c = fscanf(this.comm);
+                        c = c(1 : end - 2);
+                        % uint8(c)
+                    end
                 case this.cCONNECTION_SERIAL
                     c = fscanf(this.comm);
             end
