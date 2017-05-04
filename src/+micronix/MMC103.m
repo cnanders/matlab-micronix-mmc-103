@@ -3,32 +3,81 @@ classdef MMC103 < handle
     %MMC103 Summary of this class goes here
     %   Detailed explanation goes here
     
+    properties (Constant)
+        
+        cCONNECTION_SERIAL = 'serial'
+        cCONNECTION_TCPIP = 'tcpip'
+        cCONNECTION_TCPCLIENT = 'tcpclient'
+        
+    end
+    
     properties
         % {tcpip 1x1} tcpip connection 
         % MATLAB talks to nPort 5150A Serial Device Server over tcpip.
         % The nPort then talks to the MMC-103 using RS-485 BUS
-        c
+        comm
         
     end
     
     properties (Access = private)
         
+        % tcpip config
+        % --------------------------------
         % {char 1xm} tcp/ip host
         cTcpipHost = '192.168.0.2'
         
-        % {uint16 1x1} tcpip port network control uses telnet port 23
-        u16TcpipPort = uint16(23)
+        % {uint16 1x1} tcpip port NPort requires a port of 4001 when in
+        % "TCP server" mode
+        u16TcpipPort = uint16(4001)
+        
+        % This code uses fwrite() and fread() for all tcpip
+        % communication (instead of fprintf() and fscanf()).  The latter
+        % deal with ASCII commands and MATLAB does some magic with adding
+        % terminators in fprintf() and also in polling for terminators in
+        % fread().  The MAGIC is difficult to debug when it does not work
+        %
+        % fwrite() and fread() write and read binary data and
+        % don't do any of the terminator magic.  This is good because
+        % it lets us directly  create the data packets that are sent and
+        % directly unpack the data packets that are received. 
+        %
+        % Writing:
+        % During write commands, the binary version of the ASCII command
+        % must be followed by a space (32) and a carriage return (13).
+        % Optionally, it can be followed by 32 10 13 (space + line feed +
+        % carriage return).  Multiple write commands can be sent at
+        % once
+        %
+        % Reading
+        % The number of commands sent since the last read dictates
+        % the number of responses that will be included in the next read.
+        % Every response has a 10 (line feed) after it.  The last reaponse 
+        % additionally has a carriage return (13) after it. I.E., the last
+        % response has a 10 and a 13 after it. When a 13 is read, the data
+        % read operation containing the result of every command since the
+        % previous read is done.
+        
+        % serial config
+        % --------------------------------
+        u16BaudRate = 38400;
+        cPort = 'COM1'
+        cTerminator = 'LF/CR';
+        
+        cConnection
+        
+        % When connection is serial(), 
+        % ASCII 'CR' is equivalent to int value of 13
+        
         
         u16InputBufferSize = uint16(2^15);
         u16OutputBufferSize = uint16(2^15);
-        
-       
-        
     end
     
     methods
         
         function this = MMC103(varargin)
+            
+            this.cConnection = this.cCONNECTION_SERIAL;
             
             for k = 1 : 2: length(varargin)
                 this.msg(sprintf('passed in %s', varargin{k}));
@@ -41,10 +90,20 @@ classdef MMC103 < handle
         
         function init(this)
             
-            this.c = tcpip(this.cTcpipHost, this.u16TcpipPort);
-            % this.c.BaudRate = this.u16BaudRate;
-            this.c.InputBufferSize = this.u16InputBufferSize;
-            this.c.OutputBufferSize = this.u16OutputBufferSize;
+            switch this.cConnection
+                case this.cCONNECTION_SERIAL
+                    this.comm = serial(this.cPort);
+                    this.comm.BaudRate = this.u16BaudRate;
+                    this.comm.Terminator = this.cTerminator;
+                    % this.comm.InputBufferSize = this.u16InputBufferSize;
+                    % this.comm.OutputBufferSize = this.u16OutputBufferSize;
+                case this.cCONNECTION_TCPIP
+                    this.comm = tcpip(this.cTcpipHost, this.u16TcpipPort);
+                    this.comm.Terminator = 13; % carriage return
+                case this.cCONNECTION_TCPCLIENT
+                    this.comm = tcpclient(this.cTcpipHost, this.u16TcpipPort);
+            end
+            
 
         end
         
@@ -57,30 +116,30 @@ classdef MMC103 < handle
             
             this.msg('clearBytesAvailable()');
             
-            while this.c.BytesAvailable > 0
+            while this.comm.BytesAvailable > 0
                 cMsg = sprintf(...
                     'clearBytesAvailable() clearing %1.0f bytes', ...
-                    this.c.BytesAvailable ...
+                    this.comm.BytesAvailable ...
                 );
                 this.msg(cMsg);
-                fread(this.c, this.c.BytesAvailable);
+                fread(this.comm, this.comm.BytesAvailable);
             end
         end
         
         function connect(this)
             this.msg('connect()');
             try
-                fopen(this.c); 
+                fopen(this.comm); 
             catch ME
                 
             end
-            this.clearBytesAvailable();
+            % this.clearBytesAvailable();
         end
         
         function disconnect(this)
             this.msg('disconnect()');
             try
-                fclose(this.c);
+                fclose(this.comm);
             catch ME
             end
         end
@@ -95,11 +154,157 @@ classdef MMC103 < handle
             fprintf('MMC103 %s\n', cMsg);
         end
         
+        function c = firmwareVersion(this, u8Axis)
+            cCmd = sprintf('%uVER?', u8Axis);
+            c = this.ioChar(cCmd);
+        end
+        
+        function clearErrors(this)
+            cCmd = '0CER';
+            this.write(cCmd);
+        end
+        
+        
+        
     end
     
     
     methods (Access = protected)
         
+        % Send a command and get the result back as ASCII
+        function c = ioChar(this, cCmd)
+            this.write(cCmd)
+            c = this.read();
+        end
+        
+        % Send a command and format the result as a double
+        function d = ioDouble(this, cCmd)
+            c = this.ioChar(cCmd);
+            d = str2double(c);
+        end
+        
+        % Write an ASCII command to  
+        % Create the binary command packet as follows:
+        % Convert the char command into a list of uint8 (decimal), 
+        % concat with a space === 32 (base10) 
+        % concat with the first terminator: 10 (base10) === 'line feed')
+        % concat with the second terminator: 13 (base10)=== 'carriage return') 
+        % write the command to the tcpip port (the nPort 5150A)
+        % using binary (each uint8 is converted to stream of 8 bits, I think)
+        function write(this, cCmd)
+            
+            switch this.cConnection
+                case this.cCONNECTION_TCPCLIENT
+                    u8Cmd = [uint8(cCmd) 32 10 13];
+                    write(this.comm, u8Cmd)
+                case  this.cCONNECTION_TCPIP
+                    u8Cmd = [uint8(cCmd) 32 10 13];
+                    fwrite(this.comm, u8Cmd)
+                case this.cCONNECTION_SERIAL
+                    fprintf(this.comm, cCmd);
+            end
+                    
+        end
+        
+        % Read until the terminator is reached and convert to ASCII if
+        % necessary (tcpip and tcpclient transmit and receive binary data).
+        % @return {char 1xm} the ASCII result
+        
+        function c = read(this)
+            
+            switch this.cConnection
+                case this.cCONNECTION_TCPCLIENT
+                    u8Result = this.readToTerminator(int8(13));
+                    % remove line feed and carriage return terminator
+                    u8Result = u8Result(1 : end - 2);
+                    % convert to ASCII (char)
+                    c = char(u8Result);
+                case this.cCONNECTION_TCPIP
+                    u8Result = this.freadToTerminator(int8(13));
+                    % remove line feed terminator of single return value
+                    % and remove carriage return terminator
+                    u8Result = u8Result(1 : end - 2);
+                    % convert to ASCII (char)
+                    c = char(u8Result);
+                case this.cCONNECTION_SERIAL
+                    c = fscanf(this.comm);
+            end
+        end
+        
+        % We want to do writes with fwrite() and reads with fread() because
+        % it allows us to construct the binary data packet.  fprintf() and
+        % fscanf() do some weird shit with replacing \n by the terminator
+        % and stuff that can lead to problems.  With fwrite() and fread(),
+        % you have full control over what is sent and received.
+        %
+        % fread(), if not supplied with a number of bytes, will attempt to
+        % read tcpip.InputBufferSize bytes.  In general, Never call fread()
+        % without specifying the number of bytes because it will read for
+        % tcpip.Timeout seconds
+        %
+        % The MMC-103 documentation does not say how many bytes are
+        % returned by each command so we do not know a-priori how many
+        % bytes to wait for in the input buffer.  If we did we could have a
+        % while loop similar to while (this.comm.BytesAvailable <
+        % bytesRequired) that polls BytesAvailable and then only issues the
+        % fread(this.comm, bytesRequired) once those bytes are availabe.
+        %
+        % The alternate approach, below is more of a manual
+        % implementatation of what fscanf() does, but for binary data.   As
+        % bytes become available, read them in and check to see if the
+        % terminator character has been found.  Once the terminator is
+        % reached, the read is complete.
+        % @return {uint8 1xm} 
+
+        function u8 = freadToTerminator(this, u8Terminator)
+            
+            lTerminatorReached = false;
+            u8Result = [];
+            while(~lTerminatorReached)
+                if (this.comm.BytesAvailable > 0)
+                    % {uint8 mx1} fread returns a column, need to transpose
+                    % when appending below.
+                    u8Val = fread(this.comm, this.comm.BytesAvailable);
+                    % {uint8 1x?}
+                    u8Result = [u8Result u8Val'];
+                    % search new data for terminator
+                    u8Index = find(u8Val == u8Terminator);
+                    if ~isempty(u8Index)
+                        lTerminatorReached = true;
+                    end
+                end
+            end
+            
+            u8 = u8Result;
+            
+        end
+        
+        % See freadToTerminator
+        % Direct analog of freadToTerminator but with read() which works
+        % with tcpclient instances rather than tcpip instances
+        function u8 = readToTerminator(this, u8Terminator)
+            
+            lTerminatorReached = false;
+            u8Result = [];
+            while(~lTerminatorReached)
+                if (this.comm.BytesAvailable > 0)
+                    % Append available bytes to previously read bytes
+                    
+                    % {uint8 1xm} 
+                    u8Val = read(this.comm, this.comm.BytesAvailable);
+                    % {uint8 1x?}
+                    u8Result = [u8Result u8Val];
+                    % search new data for terminator
+                    u8Index = find(u8Val == u8Terminator);
+                    if ~isempty(u8Index)
+                        lTerminatorReached = true;
+                    end
+                end
+            end
+            
+            u8 = u8Result;
+            
+        end
         
         function l = hasProp(this, c)
             
