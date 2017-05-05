@@ -89,6 +89,8 @@ classdef MMC103 < handle
         
         u16InputBufferSize = uint16(2^15);
         u16OutputBufferSize = uint16(2^15);
+        
+        dTimeout = 5
     end
     
     methods
@@ -110,16 +112,34 @@ classdef MMC103 < handle
             
             switch this.cConnection
                 case this.cCONNECTION_SERIAL
-                    this.comm = serial(this.cPort);
-                    this.comm.BaudRate = this.u16BaudRate;
-                    this.comm.Terminator = this.cTerminator;
-                    % this.comm.InputBufferSize = this.u16InputBufferSize;
-                    % this.comm.OutputBufferSize = this.u16OutputBufferSize;
+                    try
+                        this.msg('init() creating serial instance');
+                        this.comm = serial(this.cPort);
+                        this.comm.BaudRate = this.u16BaudRate;
+                        this.comm.Terminator = this.cTerminator;
+                        % this.comm.InputBufferSize = this.u16InputBufferSize;
+                        % this.comm.OutputBufferSize = this.u16OutputBufferSize;
+                    catch ME
+                        rethrow(ME)
+                    end
                 case this.cCONNECTION_TCPIP
-                    this.comm = tcpip(this.cTcpipHost, this.u16TcpipPort);
-                    this.comm.Terminator = 13; % carriage return
+                    try 
+                        this.msg('init() creating tcpip instance');
+                        this.comm = tcpip(this.cTcpipHost, this.u16TcpipPort);
+                        this.comm.Terminator = 13; % carriage return
+                        % Don't use Nagle's algorithm; send data
+                        % immediately to the newtork
+                        this.comm.TransferDelay = 'off'; 
+                    catch ME 
+                        rethrow(ME)
+                    end
                 case this.cCONNECTION_TCPCLIENT
-                    this.comm = tcpclient(this.cTcpipHost, this.u16TcpipPort);
+                    try
+                       this.msg('init() creating tcpclient instance');
+                       this.comm = tcpclient(this.cTcpipHost, this.u16TcpipPort);
+                    catch ME
+                        rethrow(ME)
+                    end
             end
             
 
@@ -146,33 +166,46 @@ classdef MMC103 < handle
         
         function connect(this)
             this.msg('connect()');
-            try
-                fopen(this.comm); 
-            catch ME
-                
+            switch this.cConnection
+                case this.cCONNECTION_TCPCLIENT
+                    % Do nothing
+                otherwise
+                    % tcpip and serial both need to be open with fopen 
+                    try
+                        fopen(this.comm); 
+                    catch ME
+                        rethrow(ME)
+                    end
             end
-            % this.clearBytesAvailable();
+            
+            this.clearBytesAvailable();
         end
         
         function disconnect(this)
             this.msg('disconnect()');
-            try
-                fclose(this.comm);
-            catch ME
+            
+            switch this.cConnection
+                case this.cCONNECTION_TCPCLIENT
+                    % Do nothing
+                otherwise
+                    try
+                        fclose(this.comm);
+                    catch ME
+                        rethrow(ME);
+                    end
             end
         end
         
         function delete(this)
             this.msg('delete()');
             this.disconnect();
-            
         end
         
         function msg(this, cMsg)
             fprintf('MMC103 %s\n', cMsg);
         end
         
-        function c = firmwareVersion(this, u8Axis)
+        function c = getFirmwareVersion(this, u8Axis)
             cCmd = sprintf('%uVER?', u8Axis);
             c = this.ioChar(cCmd);
         end
@@ -181,9 +214,190 @@ classdef MMC103 < handle
             cCmd = '0CER';
             this.write(cCmd);
         end
+                
+        function setEncoderToDigital(this, u8Axis)
+            cCmd = sprintf('%uEAD0', u8Axis);
+            this.write(cCmd);
+        end
+        
+        function setEncoderToAnalog(this, u8Axis)
+            cCmd = sprintf('%uEAD1', u8Axis);
+            this.write(cCmd);
+        end
+        
+        function setEncoderPolarityNormal(this, u8Axis)
+            cCmd = sprintf('%uEPL0', u8Axis);
+            this.write(cCmd);
+        end
+        
+        function setEncoderPolarityReverse(this, u8Axis)
+            cCmd = sprintf('%uEPL1', u8Axis);
+            this.write(cCmd);
+        end
+        
+        function setFeedbackOpenLoop(this, u8Axis)
+            cCmd = sprintf('%uFBK0', u8Axis);
+            this.write(cCmd);
+        end
+        
+        function setFeedbackCleanOpenLoop(this, u8Axis)
+            cCmd = sprintf('%uFBK1', u8Axis);
+            this.write(cCmd);
+        end
+        
+        function setFeedbackCleanOpenLoopMoveClosedLoopDecel(this, u8Axis)
+            cCmd = sprintf('%uFBK2', u8Axis);
+            this.write(cCmd);
+        end
+        
+        function setFeedbackClosedLoop(this, u8Axis)
+            cCmd = sprintf('%uFBK3', u8Axis);
+            this.write(cCmd);
+        end
+        
+        function setHomeToNegativeLimit(this, u8Axis)
+            cCmd = sprintf('%uHCG0', u8Axis);
+            this.write(cCmd);
+        end
+        
+        function setHomeToPositiveLimit(this, u8Axis)
+            cCmd = sprintf('%uHCG1', u8Axis);
+            this.write(cCmd);
+        end
+        
+        function c = getHomePosition(this, u8Axis)
+            cCmd = sprintf('%uHCG?', u8Axis);
+            c = this.ioChar(cCmd);
+        end
+        
+        function home(this, u8Axis)
+            cCmd = sprintf('%uHOM', u8Axis);
+            this.write(cCmd);
+        end
+        
+        % turn the motor current flow “Off” or “On” for a specified axis.
+        % Turning the motor current off will cause the piezo to relax and
+        % the stage will shift slightly.
+        function setMotorOff(this, u8Axis)
+            cCmd = sprintf('%uMOT0', u8Axis);
+            this.write(cCmd);
+        end
+        
+        % turn the motor current flow “Off” or “On” for a specified axis.
+        % Turning the motor current off will cause the piezo to relax and
+        % the stage will shift slightly.
+        function setMotorOn(this, u8Axis)
+            cCmd = sprintf('%uMOT1', u8Axis);
+            this.write(cCmd);
+        end
+        
+        % @param {double 1x1} dVal - mm (deg if rotary)
+        function moveAbsolute(this, u8Axis, dVal)
+            cCmd = sprintf('%uMVA%1.6f', u8Axis, dVal);
+            this.write(cCmd);
+        end
+        
+        function d = getPosition(this, u8Axis)
+            cCmd = sprintf('%uPOS?', u8Axis);
+            c = ioChar(cCmd);
+            % returned format: theoretical_pos,encoder_pos
+            cecValues = strsplit(c, ',');
+            d = str2double(cecValues{1});
+        end
+        
+        function saveSettings(this, u8Axis)
+            cCmd = sprintf('%uSAV', u8Axis);
+            this.write(cCmd);
+        end
+        
+        function stopMotion(this, u8Axis)
+            cCmd = sprintf('%uSTP', u8Axis);
+            this.write(cCmd);
+        end
+        
+        % {double 1x1} dVal - velocity mm/s (deg/s for rotary)
+        function setVelocity(this, u8Axis, dVal)
+            cCmd = sprintf('%uVEL%1.6f', u8Axis, dVal);
+            this.write(cCmd);
+        end
+        
+        function d = getVelocity(this, u8Axis)
+            cCmd = sprintf('%uVEL?', u8Axis, dVal);
+            d = ioDouble(cCmd);
+        end
+        
+        function setCurrentPositionAsZero(this, u8Axis)
+            cCmd = sprintf('%uZRO', u8Axis);
+            this.write(cCmd);
+        end
+        
+        % {double 1x1} dVal - acceleration mm/s/s (deg/s/s for rotary)
+        % 000.001 to (500.000 mm/s/s [degrees/s/s]) | AMX
+        function setAcceleration(this, u8Axis, dVal)
+            cCmd = sprintf('%uACC%1.6f', u8Axis, dVal);
+            this.write(cCmd);
+        end
+        
+        function d = getAcceleration(this, u8Axis)
+            cCmd = sprintf('%uACC?', u8Axis);
+            d = this.ioDouble(cCmd);
+        end
+        
+        % {double 1x1} dVal - deceleration mm/s/s (deg/s/s for rotary)
+        % 000.001 to (500.000 mm/s/s [degrees/s/s]) | AMX
+        function setDeceleration(this, u8Axis, dVal)
+            cCmd = sprintf('%uDEC%1.6f', u8Axis, dVal);
+            this.write(cCmd);
+        end
+        
+        function d = getDeceleration(this, u8Axis)
+            cCmd = sprintf('%uDEC?', u8Axis, dVal);
+            d = this.ioDouble(cCmd);
+        end
+        
+        function restoreFactoryDefaults(this, u8Axis)
+            cCmd = sprintf('%uDEF', u8Axis);
+            this.write(cCmd);
+        end
+        
+        function c = readAndClearErrors(this, u8Axis)
+            cCmd = sprintf('%uERR', u8Axis);
+            c = this.ioChar(cCmd);
+        end
+        
+        function moveToNegativeLimit(this, u8Axis)
+            cCmd = sprintf('%uMLN', u8Axis);
+            this.write(cCmd);
+        end
         
         
+        function moveToPositiveLimit(this, u8Axis)
+            cCmd = sprintf('%uMLP', u8Axis);
+            this.write(cCmd);
+        end
         
+        % @return {char 1x8} - returns a char representation af a byte in
+        % binary.  Each bit is a flag for a property of the axis.  See
+        % documentation.  E.g. '10011000'
+        function c = getStatusByte(this, u8Axis)
+            cCmd = sprintf('%uSTA?', u8Axis);
+            c = this.ioChar(cCmd);
+            % Returns ASCII represention of a uint8, preceeded by the 
+            % number symbol, e.g., '#199'.
+            % Strip the pound symbol
+            c = c(2:end);
+            % Convert the char to double, then to int, then to binary string
+            % Each bit is a flag for a specific property
+            c = dec2bin(uint8(str2double(c)), 8);
+        end
+        
+        % Determine if an axis is stopped
+        % @return {logical 1x1} - true if axis is stopped
+        function l = getIsStopped(this, u8Axis)
+            % Use bit 3 (bit start at 0) from the status byte
+            cStatusByte = this.getStatusByte(u8Axis);
+            l = logical(cStatusByte(5));
+        end
     end
     
     
@@ -213,7 +427,7 @@ classdef MMC103 < handle
             switch this.cConnection
                 case this.cCONNECTION_TCPCLIENT
                     u8Cmd = [uint8(cCmd) 10 13];
-                    write(this.comm, u8Cmd)
+                    write(this.comm, u8Cmd);
                 case  this.cCONNECTION_TCPIP
                     if this.lManualPacket
                         u8Cmd = [uint8(cCmd) 10 13];
@@ -293,6 +507,12 @@ classdef MMC103 < handle
             u8Result = [];
             while(~lTerminatorReached)
                 if (this.comm.BytesAvailable > 0)
+                    
+                    cMsg = sprintf(...
+                        'freadToTerminator reading %u bytesAvailable', ...
+                        this.comm.BytesAvailable ...
+                    );
+                    this.msg(cMsg);
                     % {uint8 mx1} fread returns a column, need to transpose
                     % when appending below.
                     u8Val = fread(this.comm, this.comm.BytesAvailable);
@@ -304,6 +524,7 @@ classdef MMC103 < handle
                         lTerminatorReached = true;
                     end
                 end
+                pause(0.01)
             end
             
             u8 = u8Result;
@@ -317,8 +538,16 @@ classdef MMC103 < handle
             
             lTerminatorReached = false;
             u8Result = [];
-            while(~lTerminatorReached)
+            idTic = tic;
+            while(~lTerminatorReached && ...
+                   toc(idTic) < this.dTimeout )
                 if (this.comm.BytesAvailable > 0)
+                    
+                    cMsg = sprintf(...
+                        'readToTerminator reading %u bytesAvailable', ...
+                        this.comm.BytesAvailable ...
+                    );
+                    this.msg(cMsg);
                     % Append available bytes to previously read bytes
                     
                     % {uint8 1xm} 

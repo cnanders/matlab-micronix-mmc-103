@@ -13,8 +13,13 @@ mmc103 = micronix.MMC103(...
 
 mmc103.init();
 mmc103.connect();
-mmc103.firmwareVersion(uint8(1))
+mmc103.getFirmwareVersion(uint8(1))
+%{
+mmc103.getStatusByte(1)
+mmc103.getIsStopped(1)
+mmc103.getAcceleration(1)
 mmc103.clearErrors()
+%}
 mmc103.disconnect();
 % mmc103.comm.Terminator
 
