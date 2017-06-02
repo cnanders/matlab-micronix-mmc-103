@@ -377,6 +377,11 @@ classdef MMC103 < handle
             d = this.ioDouble(cCmd);
         end
         
+        function d = getEncoderResolution(this, u8Axis)
+            cCmd = sprintf('%uENC?', u8Axis);
+            d = this.ioDouble(cCmd);
+        end
+        
         function saveSettings(this, u8Axis)
             cCmd = sprintf('%uSAV', u8Axis);
             this.write(cCmd);
@@ -398,7 +403,11 @@ classdef MMC103 < handle
             d = this.ioDouble(cCmd);
         end
         
-        function l = getWasHomedSinceLastStartup(this, u8Axis)
+        % {return logical 1x1} true if the stage thinks it has been homed
+        % On startup, returns false.  Issue HOM command to home. The ZRO
+        % command resets the value of HOM? to false always.
+        
+        function l = getHomed(this, u8Axis)
             cCmd = sprintf('%uHOM?', u8Axis);
             d = this.ioDouble(cCmd);
             l = logical(d);

@@ -142,8 +142,19 @@ You will find that `theoretical_pos` will be updated to 5 and the `encoder_pos` 
 1. get the current polarity `1EPL?` (returns 0 [default] or 1)
 2. set the polarity to the opposite value using `1EPL1` or `1EPL0`
 
+## How To Check For Missing Counts
 
+The interpolator has colored LED to indicate signal strength.  Send the stage to one limit and then to the other limit watching the signal strength LED color.  It should stay green the entire time.  If it turns yellow, orange, or red at any point, there is a good chance you are loosing encoder counts at those stage positions.
 
+## HOM
+
+Whenever the `1HOM` command is issued, it resets the "if homed since last startup" to zero.  The `1HOM?` query is available during the homing routing and returns zero during the home routine
+
+## ZRO
+
+Whenever the `ZRO` command is issued, it resets "if homed since last startup" to zero
+
+Whereever the stage is when the controller is turned on - it sets the encoder to zero at that location.
 
 
 
