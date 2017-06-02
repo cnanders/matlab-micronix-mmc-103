@@ -210,6 +210,10 @@ classdef MMC103 < handle
             c = this.ioChar(cCmd);
         end
         
+       
+        
+        
+        
         function clearErrors(this)
             cCmd = '0CER';
             this.write(cCmd);
@@ -220,8 +224,32 @@ classdef MMC103 < handle
             this.write(cCmd);
         end
         
+        % {uint8 1x1} u8Axis - the axis
+        % {uint8 1x1} u8Val [0, 1, 2, 3] - see Chapter 4.1 of the manual
+        % 0 = traditional open loop tries to achieve user-set velocity
+        % 1 = another version of open loop that never stresses the motor
+        % and uses an easier velocity
+        % 2 = closed loop to `theoretical_pos` always using mode 1 (no
+        % stress on motor) during moves
+        % 3 = closed loop using user-set velocity during moves
+        
+        function setFeedbackMode(this, u8Axis, u8Val)
+            cCmd = sprintf('%uFBK%u', u8Axis, u8Val);
+            this.write(cCmd);
+        end
+        
+        function d = getFeedbackMode(this, u8Axis)
+            cCmd = sprintf('%uFBK?', u8Axis);
+            d = this.ioDouble(cCmd);
+        end
+        
         function setEncoderToAnalog(this, u8Axis)
             cCmd = sprintf('%uEAD1', u8Axis);
+            this.write(cCmd);
+        end
+        
+        function setEncoderPolarity(this, u8Axis, u8Val)
+            cCmd = sprintf('%uEPL%u', u8Axis, u8Val);
             this.write(cCmd);
         end
         
@@ -255,6 +283,16 @@ classdef MMC103 < handle
             this.write(cCmd);
         end
         
+        function setSoftLimitNegativePosition(this, u8Axis, dVal)
+            cCmd = sprintf('%uTLN%1.6f', u8Axis, dVal);
+            this.write(cCmd);
+        end
+        
+        function setSoftLimitPositivePosition(this, u8Axis, dVal)
+            cCmd = sprintf('%uTLP%1.6f', u8Axis, dVal);
+            this.write(cCmd);
+        end
+        
         function setHomeToNegativeLimit(this, u8Axis)
             cCmd = sprintf('%uHCG0', u8Axis);
             this.write(cCmd);
@@ -268,6 +306,17 @@ classdef MMC103 < handle
         function c = getHomePosition(this, u8Axis)
             cCmd = sprintf('%uHCG?', u8Axis);
             c = this.ioChar(cCmd);
+        end
+        
+        
+        function d = getSoftLimitNegativePosition(this, u8Axis)
+            cCmd = sprintf('%uTLN?', u8Axis);
+            d = this.ioDouble(cCmd);
+        end
+        
+        function d = getSoftLimitPositivePosition(this, u8Axis)
+            cCmd = sprintf('%uTLP?', u8Axis);
+            d = this.ioDouble(cCmd);
         end
         
         function home(this, u8Axis)
@@ -297,12 +346,35 @@ classdef MMC103 < handle
             this.write(cCmd);
         end
         
-        function d = getPosition(this, u8Axis)
+        
+        function c = getErrors(this, u8Axis)
+            cCmd = sprintf('%uERR?', u8Axis);
+            c = this.ioChar(cCmd);
+        end
+        
+        function d = getTheoreticalPosition(this, u8Axis)
             cCmd = sprintf('%uPOS?', u8Axis);
-            c = ioChar(cCmd);
-            % returned format: theoretical_pos,encoder_pos
+            c = this.ioChar(cCmd);
+            % returned format: #theoretical_pos,encoder_pos
+            % strip leading '#' character
+            c = c(2:end);
             cecValues = strsplit(c, ',');
             d = str2double(cecValues{1});
+        end
+        
+        function d = getEncoderPosition(this, u8Axis)
+            cCmd = sprintf('%uPOS?', u8Axis);
+            c = this.ioChar(cCmd);
+            % returned format: #theoretical_pos,encoder_pos
+            % strip leading '#' character
+            c = c(2:end);
+            cecValues = strsplit(c, ',');
+            d = str2double(cecValues{2});
+        end
+        
+        function d = getEncoderPolarity(this, u8Axis)
+            cCmd = sprintf('%uEPL?', u8Axis);
+            d = this.ioDouble(cCmd);
         end
         
         function saveSettings(this, u8Axis)
@@ -322,8 +394,14 @@ classdef MMC103 < handle
         end
         
         function d = getVelocity(this, u8Axis)
-            cCmd = sprintf('%uVEL?', u8Axis, dVal);
-            d = ioDouble(cCmd);
+            cCmd = sprintf('%uVEL?', u8Axis);
+            d = this.ioDouble(cCmd);
+        end
+        
+        function l = getWasHomedSinceLastStartup(this, u8Axis)
+            cCmd = sprintf('%uHOM?', u8Axis);
+            d = this.ioDouble(cCmd);
+            l = logical(d);
         end
         
         function setCurrentPositionAsZero(this, u8Axis)
@@ -398,21 +476,11 @@ classdef MMC103 < handle
             cStatusByte = this.getStatusByte(u8Axis);
             l = logical(cStatusByte(5));
         end
-    end
-    
-    
-    methods (Access = protected)
         
         % Send a command and get the result back as ASCII
         function c = ioChar(this, cCmd)
             this.write(cCmd)
             c = this.read();
-        end
-        
-        % Send a command and format the result as a double
-        function d = ioDouble(this, cCmd)
-            c = this.ioChar(cCmd);
-            d = str2double(c);
         end
         
         % Write an ASCII command to  
@@ -444,6 +512,22 @@ classdef MMC103 < handle
             end
                     
         end
+    end
+    
+    
+    methods (Access = protected)
+        
+        
+        
+        % Send a command and format the result as a double
+        function d = ioDouble(this, cCmd)
+            c = this.ioChar(cCmd);
+            % strip leading '#' char
+            c = c(2:end);
+            d = str2double(c);
+        end
+        
+        
         
         % Read until the terminator is reached and convert to ASCII if
         % necessary (tcpip and tcpclient transmit and receive binary data).
