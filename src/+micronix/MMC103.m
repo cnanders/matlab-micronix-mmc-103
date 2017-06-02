@@ -483,7 +483,7 @@ classdef MMC103 < handle
         function l = getIsStopped(this, u8Axis)
             % Use bit 3 (bit start at 0) from the status byte
             cStatusByte = this.getStatusByte(u8Axis);
-            l = logical(cStatusByte(5));
+            l = logical(str2double(cStatusByte(5)));
         end
         
         % Send a command and get the result back as ASCII
