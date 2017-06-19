@@ -346,6 +346,11 @@ classdef MMC103 < handle
             this.write(cCmd);
         end
         
+        function moveRelative(this, u8Axis, dVal)
+            cCmd = sprintf('%uMVR%1.6f', u8Axis, dVal);
+            this.write(cCmd);
+        end
+        
         
         function c = getErrors(this, u8Axis)
             cCmd = sprintf('%uERR?', u8Axis);
@@ -501,6 +506,7 @@ classdef MMC103 < handle
         % using binary (each uint8 is converted to stream of 8 bits, I think)
         function write(this, cCmd)
             
+            this.msg(sprintf('write %s', cCmd))
             switch this.cConnection
                 case this.cCONNECTION_TCPCLIENT
                     u8Cmd = [uint8(cCmd) 10 13];
