@@ -64,6 +64,12 @@ FTDI provides a [USB -> Virtual COM Port (VCP) (RS-232) driver](http://www.ftdic
     - DONT: `fprintf(this.serial, '1VER \n\r')`
 
 
+# Notes from Commissioning With Real Hardware
+
+## Encoder Resolution / EDV
+
+The MMC-103 shipped with the encoder resolution `1ENC?` set to 2 nm. The encoder was configured for 10 nm so there was a 5X error between `theoretical_pos` and `encoder_pos` (see below).  Updating the encoder resoltution 10 removed the discrepancy between `theoretical_pos` and `encoder_pos`.  However, it was later found that this change of settings introduced another error.  The stage would regularly lose it’s encoder during `1HOM` home commands.  The solution to this was to modify a hidden, undocumented setting `EDV`, only accessible once logged with the micronix-provided administrative credentials.  (Can login using `0LCK23982` command - the preceeding “0” is for all channels). The `EDV` setting has something to do with reading the encoder value (possibly earliest data valid?).  It was increased from the shipped setting of 8000 to 50000.  Matt from Micronix was the one that suggested this change after we reproducibly lost the encoder during `1HOM` command.  Matt also said that this setting is supposed to scale linearly with encoder resolution (`ENC`) so after the resolution was increased from 2 nm to 10 nm, the `EDV` value should also be scaled 5X from 8000 to 40000 (but it was set even higher to 50000).
+
 ## POS? Query: `theoretical_pos` vs. `encoder_pos`
 
 The `POS?` query returns two values: `theoretical_pos`, `encoder_pos`.  This can be pretty confusing so let me explain.  Whenever the MMC-103 controller is power-cycled, the current stage position is set to a `theoretical_pos` value of zero.  
