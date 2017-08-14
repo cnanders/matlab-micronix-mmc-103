@@ -22,7 +22,7 @@ See [https://github.com/cnanders/matlab-moxa-nport-notes](https://github.com/cna
 
 The Moxa is configured in TCP Client operation mode
 
-## ASCII Terminator Characters
+## ASCII Terminator Characters (Sending Data)
 
 Per the documentation: 
 
@@ -45,16 +45,17 @@ u8Cmd = [uint8(cCmd) 10 13];
 write(this.comm, u8Cmd);
 ```
 
-You may also be able to do it without the line-feed., E.g., 
+You can also omit the line-feed., E.g., 
 
 ```matlab
 u8Cmd = [uint8(cCmd) 13];
 write(this.comm, u8Cmd);
 ```
 
-- When receiving data, each line of data will be followed by the ASCII “new line” character (10 in decimal, “\n”) *except* the final line (or first line if final line is first line!) which ends in the ASCII new line (10 in decimal, “\n”) *and* ASCII “carriage return” (13 in decimal) terminating characters “\n\r”.
+## ASCII Terminator Characters (Receiving Data)
 
-- See `fprintf(serial)` vs. `fwrite(tcpip)` vs. `write(tcpclient)` notes on ASCII data. 
+- When receiving data, each line of data will be followed by the ASCII “new line” character (10 in decimal, “\n”) *except* the final line (or first line if final line is first line!) which ends in the ASCII new line (10 in decimal, “\n”) *and* ASCII “carriage return” (13 in decimal) terminating characters “\n\r”.
+- See [https://github.com/cnanders/matlab-ascii-comm-notes](https://github.com/cnanders/matlab-ascii-comm-notes)
 
 
 # Notes from Commissioning With Real Hardware
