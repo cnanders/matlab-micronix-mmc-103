@@ -30,35 +30,8 @@ classdef MMC103 < handle
         % "TCP server" mode
         u16TcpipPort = uint16(4001)
         
-        % The tcpip implementation can make use of fprintf() for writing
-        % commands and fscanf() for reading commands since all of the data
-        % is passed using ASCII format.  fprintf() converts an ASCII string
-        % to an array of int8 (one int8 per character) and subsequently converts
-        % each int8 to 8 bits (e.g., 00110100) to form the data packet.
-        % Note that there is also a subtle thing with fprintf that it
-        % formats the char you provide as %s\n (or optionally you can
-        % provide a format) and replaces instances of \n with the
-        % terminator byte
-        %
-        % fscanf() is a nice utility because while it is reading, it
-        % continuously polls until it reads the terminator byte.
-        %
-        % The tcpclient implmentation must manually build the data packets
-        % and manually poll for the termination byte because fprintf and
-        % fscanf are not supported by tcpclient instances. 
-        %
-        % fwrite() and fread() write and read binary data and
-        % fread does not do any polling.  This is good because
-        % it lets us directly  create the data packets that are sent and
-        % directly unpack the data packets that are received. 
-        %
-        % Writing:
-        % During write commands, the binary version of the ASCII command
-        % must be followed by a carriage return (13).
-        % Optionally, it can be followed 10 13 (space + line feed +
-        % carriage return).  Multiple write commands can be sent at
-        % once
-        %
+        
+        
         % Reading
         % The number of commands sent since the last read dictates
         % the number of responses that will be included in the next read.
@@ -541,9 +514,7 @@ classdef MMC103 < handle
             c = c(2:end);
             d = str2double(c);
         end
-        
-        
-        
+                
         % Read until the terminator is reached and convert to ASCII if
         % necessary (tcpip and tcpclient transmit and receive binary data).
         % @return {char 1xm} the ASCII result
