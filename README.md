@@ -16,11 +16,11 @@ FTDI provides a [USB -> Virtual COM Port (VCP) (RS-232) driver](http://www.ftdic
 [Check to see if your OS automatically creates a VCP for the FTDI without installing the driver](https://github.com/cnanders/matlab-npoint-lc400#terminal)
 
 
-### Option 2. Use NPort Serial Device Server
+### Option 2. Use NPort Serial Device Server in TCP Server Mode
 
 See [https://github.com/cnanders/matlab-moxa-nport-notes](https://github.com/cnanders/matlab-moxa-nport-notes)
 
-The Moxa is configured in TCP Client operation mode
+The Moxa is configured in TCP Server  operation mode
 
 ## ASCII Terminator Characters (Sending Data)
 
