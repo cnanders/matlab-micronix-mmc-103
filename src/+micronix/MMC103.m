@@ -175,7 +175,7 @@ classdef MMC103 < handle
         end
         
         function msg(this, cMsg)
-            fprintf('MMC103 %s\n', cMsg);
+            % fprintf('MMC103 %s\n', cMsg);
         end
         
         function c = getFirmwareVersion(this, u8Axis)
