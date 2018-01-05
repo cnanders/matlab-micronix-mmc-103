@@ -399,7 +399,7 @@ classdef MMC103 < handle
         
         % {double 1x1} dVal - velocity mm/s (deg/s for rotary)
         function setVelocity(this, u8Axis, dVal)
-            cCmd = sprintf('%uVEL%1.6f', u8Axis, dVal);
+            cCmd = sprintf('%uVEL%1.3f', u8Axis, dVal);
             this.write(cCmd);
         end
         
@@ -506,7 +506,7 @@ classdef MMC103 < handle
         % using binary (each uint8 is converted to stream of 8 bits, I think)
         function write(this, cCmd)
             
-            this.msg(sprintf('write %s', cCmd))
+            % this.msg(sprintf('write %s', cCmd))
             switch this.cConnection
                 case this.cCONNECTION_TCPCLIENT
                     u8Cmd = [uint8(cCmd) 10 13];
