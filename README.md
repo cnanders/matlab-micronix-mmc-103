@@ -160,7 +160,7 @@ Whereever the stage is when the controller is turned on - it sets the encoder to
 
 ## Notes From 2018.01.18 Call With Matt From Micronix When Motor Was Stuck
 
-- In general, Matt from Micronix believes that our stage has a large amount of friction.  Using factory settings causes the stage to get stuck.  We had to fine-tune several factory settings to get it to move out of its stuck position and restore functionality.  The summary is that it has to move much slower that it is capable of moving. 
+- In general, Matt from Micronix believes that our stage has a large amount of friction.  Using factory settings causes the stage to get stuck.  We had to fine-tune several admin-locked, undocumented factory settings to get it to move out of its stuck position and restore functionality.  The summary is that it has to move much slower that it is capable of moving. 
 - We ended up decreacing velocity `VEL` from 1.5 to 1 `write('1VEL1')` and resolution `REZ` from 6000 to 4000 `write('1REZ4000')`
 - In addition, during `moveToNegativeLimit()` and  `moveToPositiveLimit()`, different, admin-locked velocities are used. These are accessible by 
   - first unlocking with `write('0LCK23982')` (see description above), 
