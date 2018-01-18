@@ -25,7 +25,9 @@ mmc.getFirmwareVersion(uint8(1)) % should be '#MMC-103.X1 v1.1.6' if not somethi
 mmc.getEncoderPosition(1)
 mmc.getEncoderPosition(1)
 mmc.getEncoderPosition(2)
-mmc.disconnect()
+
+
+% mmc.disconnect()
 % mmc.disconnect()
 
 % mmc.reset() % Do this if there are problems with a queue of answers
@@ -43,7 +45,7 @@ mmc.getFeedbackMode(uint8(1))
 %{
 mmc.write('1FBK0') % sets feedback mode of channel 1 to 0 (no feedback)
 mmc.ioChar('1FBK?') % queries feedback mode
-mmc.write('1VEL1.5') % sets velocity of channel 1 to 0.5 mm /s
+mmc.write('1VEL1.5') % sets velocity of channel 1 to 1.5 mm /s
 mmc.write('1SAV') % saves all channel 1 settings
 %}
 % mmc.getAcceleration(1)
@@ -51,10 +53,20 @@ mmc.write('1SAV') % saves all channel 1 settings
 % mmc.disconnect();
 % mmc.comm.Terminator
 
+mmc.ioChar('1ENC?')
+mmc.ioChar('1VEL?')
+
 
 % mmc.disconnect();
 
 
+%{
+ mmc.ioChar('1REZ?')
+
+ans =
+
+    '#6000'
+%}
 
 
 

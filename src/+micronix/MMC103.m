@@ -384,6 +384,12 @@ classdef MMC103 < handle
             d = this.ioDouble(cCmd);
         end
         
+        % This command returns the actual velocity calculated from the encoder.
+        function d = getVelocityActual(this, u8Axis)
+            cCmd = sprintf('%uVRT?', u8Axis);
+            d = this.ioDouble(cCmd);
+        end
+        
         % {return logical 1x1} true if the stage thinks it has been homed
         % On startup, returns false.  Issue HOM command to home. The ZRO
         % command resets the value of HOM? to false always.
