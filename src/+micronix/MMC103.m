@@ -63,7 +63,7 @@ classdef MMC103 < handle
         u16InputBufferSize = uint16(2^15);
         u16OutputBufferSize = uint16(2^15);
         
-        dTimeout = 5
+        dTimeout = 1
     end
     
     methods
@@ -125,16 +125,18 @@ classdef MMC103 < handle
             % the results come back all with -1.6050e9.  Need to figure
             % this out
             
-            this.msg('clearBytesAvailable()');
+            lDebug = false;
+            lDebug && fprintf('clearBytesAvailable()\n');
             
             while this.comm.BytesAvailable > 0
                 cMsg = sprintf(...
-                    'clearBytesAvailable() clearing %1.0f bytes', ...
+                    'clearBytesAvailable() clearing %1.0f bytes\n', ...
                     this.comm.BytesAvailable ...
                 );
-                this.msg(cMsg);
+                lDebug && fprintf(cMsg);
                 fread(this.comm, this.comm.BytesAvailable);
             end
+            
         end
         
         function connect(this)
@@ -175,7 +177,7 @@ classdef MMC103 < handle
         end
         
         function msg(this, cMsg)
-            % fprintf('MMC103 %s\n', cMsg);
+            % fprintf('micronix.MMC103() %s\n', cMsg);
         end
         
         function c = getFirmwareVersion(this, u8Axis)
@@ -347,6 +349,7 @@ classdef MMC103 < handle
             % strip leading '#' character
             c = c(2:end);
             cecValues = strsplit(c, ',');
+            
             d = str2double(cecValues{2});
         end
         
@@ -464,8 +467,15 @@ classdef MMC103 < handle
             l = logical(str2double(cStatusByte(5)));
         end
         
+        % Perform a soft reset of specified axis
+        function reset(this, u8Axis)
+            cCmd = sprintf('%uRST', u8Axis);
+            this.write(cCmd);
+        end
+        
         % Send a command and get the result back as ASCII
         function c = ioChar(this, cCmd)
+            this.clearBytesAvailable();
             this.write(cCmd)
             c = this.read();
         end
@@ -479,14 +489,15 @@ classdef MMC103 < handle
         % using binary (each uint8 is converted to stream of 8 bits, I think)
         function write(this, cCmd)
             
-            % this.msg(sprintf('write %s', cCmd))
+           lDebug = false;
+           lDebug && fprintf('micronix.MMC103.write(%s)\n', cCmd);
             switch this.cConnection
                 case this.cCONNECTION_TCPCLIENT
-                    u8Cmd = [uint8(cCmd) 10 13];
+                    u8Cmd = [uint8(cCmd) 13];
                     write(this.comm, u8Cmd);
                 case  this.cCONNECTION_TCPIP
                     if this.lManualPacket
-                        u8Cmd = [uint8(cCmd) 10 13];
+                        u8Cmd = [uint8(cCmd) 13];
                         fwrite(this.comm, u8Cmd);
                     else
                         % default format for fprintf is %s\n and 
@@ -500,21 +511,8 @@ classdef MMC103 < handle
             end
                     
         end
-    end
-    
-    
-    methods (Access = protected)
         
         
-        
-        % Send a command and format the result as a double
-        function d = ioDouble(this, cCmd)
-            c = this.ioChar(cCmd);
-            % strip leading '#' char
-            c = c(2:end);
-            d = str2double(c);
-        end
-                
         % Read until the terminator is reached and convert to ASCII if
         % necessary (tcpip and tcpclient transmit and receive binary data).
         % @return {char 1xm} the ASCII result
@@ -545,6 +543,23 @@ classdef MMC103 < handle
                     c = fscanf(this.comm);
             end
         end
+        
+    end
+    
+    
+    methods (Access = protected)
+        
+        
+        
+        % Send a command and format the result as a double
+        function d = ioDouble(this, cCmd)
+            c = this.ioChar(cCmd);
+            % strip leading '#' char
+            c = c(2:end);
+            d = str2double(c);
+        end
+                
+        
         
         % We want to do writes with fwrite() and reads with fread() because
         % it allows us to construct the binary data packet.  fprintf() and
@@ -609,15 +624,18 @@ classdef MMC103 < handle
             lTerminatorReached = false;
             u8Result = [];
             idTic = tic;
+            lDebug = false;
             while(~lTerminatorReached && ...
                    toc(idTic) < this.dTimeout )
+               
                 if (this.comm.BytesAvailable > 0)
                     
-                    cMsg = sprintf(...
-                        'readToTerminator reading %u bytesAvailable', ...
-                        this.comm.BytesAvailable ...
-                    );
-                    this.msg(cMsg);
+                    cMsg = [...
+                        sprintf('readToTerminator(%d) ', u8Terminator), ...
+                        sprintf('reading %u bytesAvailable', this.comm.BytesAvailable), ...
+                        '\n' ...
+                    ];
+                    lDebug && fprintf(cMsg);
                     % Append available bytes to previously read bytes
                     
                     % {uint8 1xm} 
@@ -629,6 +647,12 @@ classdef MMC103 < handle
                     if ~isempty(u8Index)
                         lTerminatorReached = true;
                     end
+                else
+                    cMsg = sprintf(...
+                        'micronix.MMC103.readToTerminator() no BytesAvailable %1.3f s\n', ...
+                        toc(idTic) ...
+                    );
+                    % lDebug && fprintf(cMsg);
                 end
             end
             
