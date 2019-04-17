@@ -318,6 +318,7 @@ classdef MMC103 < handle
         % @param {double 1x1} dVal - mm (deg if rotary)
         function moveAbsolute(this, u8Axis, dVal)
             cCmd = sprintf('%uMVA%1.6f', u8Axis, dVal);
+            fprintf('micronix.MMC103.moveAbsolute sending %s\n', cCmd);
             this.write(cCmd);
         end
         
@@ -347,10 +348,20 @@ classdef MMC103 < handle
             c = this.ioChar(cCmd);
             % returned format: #theoretical_pos,encoder_pos
             % strip leading '#' character
+            
             c = c(2:end);
+                            
             cecValues = strsplit(c, ',');
             
-            d = str2double(cecValues{2});
+            try
+                d = str2double(cecValues{2});
+                if isnan(d)
+                    d = 0;
+                end
+            catch mE
+                d = 0
+            end
+                
         end
         
         function d = getEncoderPolarity(this, u8Axis)
@@ -550,6 +561,14 @@ classdef MMC103 < handle
             end
         end
         
+        % Send a command and format the result as a double
+        function d = ioDouble(this, cCmd)
+            c = this.ioChar(cCmd)
+            % strip leading '#' char
+            c = c(2:end);
+            d = str2double(c);
+        end
+        
     end
     
     
@@ -557,13 +576,7 @@ classdef MMC103 < handle
         
         
         
-        % Send a command and format the result as a double
-        function d = ioDouble(this, cCmd)
-            c = this.ioChar(cCmd);
-            % strip leading '#' char
-            c = c(2:end);
-            d = str2double(c);
-        end
+        
                 
         
         

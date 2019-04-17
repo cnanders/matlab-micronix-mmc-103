@@ -48,8 +48,8 @@ mmc.ioChar('1FBK?') % queries feedback mode
 mmc.write('1VEL1.5') % sets velocity of channel 1 to 1.5 mm /s
 mmc.write('1SAV') % saves all channel 1 settings
 %}
-% mmc.getAcceleration(1)
-% mmc.clearErrors()
+mmc.getAcceleration(1)
+mmc.clearErrors()
 % mmc.disconnect();
 % mmc.comm.Terminator
 
