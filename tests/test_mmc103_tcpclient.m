@@ -70,3 +70,26 @@ ans =
 
 
 
+%% How to fix if it gets stuck on negative limit.
+%% CODE BELOW WORKS.  TESTED 2019.08.28 BY CHRIS.
+
+% I found that the stage has a hard time moving from the negative limit to
+% the positive limit with the configuration / velocity it has right now.
+% It can move from the positive limit towards the negative limit OK but not
+% the other way.  When issuing mmc.moveToPositiveLimit() , the controller
+% overrides velocities / accellerations and uses defaults that work.  The
+% trick is to use a combination of moveToPositiveLimit() and stopMotion()
+% to stop it where you want.
+
+%{
+% The stage sometimes gets stuck trying to reach the negative limit. It
+% can't get there. 
+
+mmc.moveToPositiveLimit(1) %
+mmc.home(1) %when on positive limit, home doesn't try to go to negative limit, which is unreachable
+
+% This command moves to center M142 under the beam
+mmc.moveAbsolute(1, -34.8)
+%}
+
+
